@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "GPT Chat Notes",
+  "description": "Per-chat notes for ChatGPT and Gemini",
+  "version": "2.0",
+  "permissions": ["storage", "activeTab"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}
+
