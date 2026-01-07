@@ -467,40 +467,75 @@ function createNoteDialog() {
 
 // Text selection handling
 document.addEventListener('mouseup', handleTextSelection);
+document.addEventListener('touchend', handleTextSelection);
 
 function handleTextSelection(e) {
-  const selection = window.getSelection();
-  const text = selection.toString().trim();
+  // Small delay to ensure selection is complete
+  setTimeout(() => {
+    const selection = window.getSelection();
+    const text = selection.toString().trim();
 
-  if (text.length === 0 || text.length > 500) {
-    hideHighlightPopup();
-    return;
-  }
+    console.log('Text selected:', text); // Debug log
 
-  // Check if selection is within chat messages
-  const range = selection.getRangeAt(0);
-  const container = range.commonAncestorContainer;
-  const messageElement = container.nodeType === 3
-    ? container.parentElement?.closest('[data-message-author-role], .model-response, .user-message, article')
-    : container.closest('[data-message-author-role], .model-response, .user-message, article');
+    if (text.length === 0 || text.length > 500) {
+      hideHighlightPopup();
+      return;
+    }
 
-  if (!messageElement) {
-    hideHighlightPopup();
-    return;
-  }
+    // Don't show popup if clicking inside the popup itself
+    if (highlightPopup && highlightPopup.contains(e.target)) {
+      return;
+    }
 
-  selectedRange = range;
-  selectedText = text;
+    try {
+      selectedRange = selection.getRangeAt(0);
+      selectedText = text;
 
-  showHighlightPopup(e.pageX, e.pageY);
+      // Get cursor position
+      const x = e.pageX || e.clientX + window.scrollX;
+      const y = e.pageY || e.clientY + window.scrollY;
+
+      showHighlightPopup(x, y);
+      console.log('Showing highlight popup at', x, y); // Debug log
+    } catch (err) {
+      console.error('Error handling text selection:', err);
+    }
+  }, 10);
 }
 
 function showHighlightPopup(x, y) {
-  if (!highlightPopup) createHighlightPopup();
+  if (!highlightPopup) {
+    createHighlightPopup();
+  }
+
+  // Ensure popup is attached to DOM
+  if (!document.body.contains(highlightPopup)) {
+    document.body.appendChild(highlightPopup);
+  }
+
+  // Position popup above the cursor
+  let posX = x;
+  let posY = y - 70; // Position above cursor
+
+  // Prevent popup from going off-screen
+  const popupWidth = 250; // Approximate width
+  const popupHeight = 60; // Approximate height
+
+  if (posX + popupWidth > window.innerWidth) {
+    posX = window.innerWidth - popupWidth - 10;
+  }
+
+  if (posY < 0) {
+    posY = y + 20; // Show below cursor if no room above
+  }
 
   highlightPopup.style.display = 'block';
-  highlightPopup.style.left = `${x}px`;
-  highlightPopup.style.top = `${y - 60}px`;
+  highlightPopup.style.left = `${posX}px`;
+  highlightPopup.style.top = `${posY}px`;
+  highlightPopup.style.position = 'absolute';
+  highlightPopup.style.zIndex = '999999';
+
+  console.log('Popup displayed at:', posX, posY);
 }
 
 function hideHighlightPopup() {
@@ -508,6 +543,17 @@ function hideHighlightPopup() {
     highlightPopup.style.display = 'none';
   }
 }
+
+// Hide popup when clicking elsewhere
+document.addEventListener('mousedown', (e) => {
+  if (highlightPopup && !highlightPopup.contains(e.target)) {
+    // Don't hide if we're selecting text
+    const selection = window.getSelection();
+    if (!selection.toString().trim()) {
+      hideHighlightPopup();
+    }
+  }
+});
 
 function applyHighlight(color, note = '') {
   if (!selectedRange) return;
@@ -673,15 +719,29 @@ flashStyle.textContent = `
 `;
 document.head.appendChild(flashStyle);
 
-// Initialize highlighting features
-createHighlightPopup();
-createNavigationWidget();
-createNoteDialog();
+// Initialize highlighting features when DOM is ready
+function initializeExtension() {
+  console.log('Initializing GPT Chat Notes & Highlights extension...');
 
-// Load highlights when page loads
-setTimeout(() => {
-  loadHighlights();
-}, 1000);
+  createHighlightPopup();
+  createNavigationWidget();
+  createNoteDialog();
+
+  // Load highlights when page loads
+  setTimeout(() => {
+    loadHighlights();
+    console.log('Highlights loaded');
+  }, 1500);
+
+  console.log('Extension initialized successfully');
+}
+
+// Wait for page to be ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeExtension);
+} else {
+  initializeExtension();
+}
 
 // Reload highlights when URL changes
 let lastUrl = location.href;
@@ -690,6 +750,7 @@ setInterval(() => {
     lastUrl = location.href;
     highlights = [];
     currentHighlightIndex = -1;
+    console.log('URL changed, reloading highlights...');
     setTimeout(loadHighlights, 500);
   }
 }, 1000);
